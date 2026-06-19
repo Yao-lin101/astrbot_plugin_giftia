@@ -38,6 +38,7 @@ class Database:
                     message_id TEXT,
                     content TEXT,
                     media_ids TEXT,
+                    role TEXT,
                     reply_decision INTEGER,
                     use_rag INTEGER,
                     is_recalled INTEGER,
@@ -45,6 +46,15 @@ class Database:
                     updated_at DATETIME
                 )
             """)  # 0: 判断拒绝, 1: 判断通过, 2: 未审查
+            # 自动迁移已有的 chat_history 表，添加 role 列
+            try:
+                await cursor.execute("ALTER TABLE chat_history ADD COLUMN role TEXT")
+            except aiosqlite.OperationalError as e:
+                if (
+                    "duplicate" not in str(e).lower()
+                    and "already exists" not in str(e).lower()
+                ):
+                    logger.warning(f"Failed to add role column to chat_history: {e}")
             # 创建索引
             await cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_group_bot ON chat_history (group_or_user_id, bot_name, created_at)"
