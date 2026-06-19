@@ -757,57 +757,62 @@ caption: {media_caption.caption}"""
             proactive_prob = decision_conf.get("proactive_probability", 0)
 
             is_active_window = active_counter > 0
-            is_proactive_hit = (
-                proactive_prob > 0 and random.randint(1, 100) <= proactive_prob
-            )
-
-            # Keyword trigger check
+            is_proactive_hit = False
             is_keyword_hit = False
-            if (
-                decision_conf.get("keyword_trigger_enabled", False)
-                and current_message.content
-            ):
-                content_lower = current_message.content.lower()
-                keyword_rules = decision_conf.get("keyword_rules", [])
-                default_prob = decision_conf.get("keyword_default_probability", 100)
 
-                for rule_str in keyword_rules:
-                    if not rule_str or not isinstance(rule_str, str):
-                        continue
-                    if ":" in rule_str:
-                        keywords_str, prob_str = rule_str.split(":", 1)
-                        prob = prob_str.strip()
-                    else:
-                        keywords_str = rule_str
-                        prob = default_prob
+            if is_active_window:
+                decrement_counter = True
+            else:
+                is_proactive_hit = (
+                    proactive_prob > 0 and random.randint(1, 100) <= proactive_prob
+                )
 
-                    kw_list = [
-                        k.strip() for k in re.split(r"[,，]", keywords_str) if k.strip()
-                    ]
-                    for kw in kw_list:
-                        if kw.lower() in content_lower:
-                            try:
-                                prob_val = int(prob)
-                            except (ValueError, TypeError):
-                                prob_val = default_prob
+                # Keyword trigger check
+                if (
+                    not is_proactive_hit
+                    and decision_conf.get("keyword_trigger_enabled", False)
+                    and current_message.content
+                ):
+                    content_lower = current_message.content.lower()
+                    keyword_rules = decision_conf.get("keyword_rules", [])
+                    default_prob = decision_conf.get("keyword_default_probability", 100)
 
-                            if random.randint(1, 100) <= prob_val:
-                                is_keyword_hit = True
-                                logger.info(
-                                    f"{bot_name} 匹配到兴趣关键词 '{kw}'，触发接话决策"
-                                )
+                    for rule_str in keyword_rules:
+                        if not rule_str or not isinstance(rule_str, str):
+                            continue
+                        if ":" in rule_str:
+                            keywords_str, prob_str = rule_str.split(":", 1)
+                            prob = prob_str.strip()
+                        else:
+                            keywords_str = rule_str
+                            prob = default_prob
+
+                        kw_list = [
+                            k.strip()
+                            for k in re.split(r"[,，]", keywords_str)
+                            if k.strip()
+                        ]
+                        for kw in kw_list:
+                            if kw.lower() in content_lower:
+                                try:
+                                    prob_val = int(prob)
+                                except (ValueError, TypeError):
+                                    prob_val = default_prob
+
+                                if random.randint(1, 100) <= prob_val:
+                                    is_keyword_hit = True
+                                    logger.info(
+                                        f"{bot_name} 匹配到兴趣关键词 '{kw}'，触发接话决策"
+                                    )
+                                break
+                        if is_keyword_hit:
                             break
-                    if is_keyword_hit:
-                        break
 
             if not is_active_window and not is_proactive_hit and not is_keyword_hit:
                 logger.debug(
                     "没有at机器人且不满足接话分析窗口、主动概率或关键词触发，跳过处理"
                 )
                 return
-
-            if is_active_window:
-                decrement_counter = True
 
         # 跳过没有文本也没有图片的消息
         if not current_message.content and not image_urls and not audio_urls:
