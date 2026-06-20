@@ -399,7 +399,7 @@ class XmlParse:
                     text = child.get_text(strip=True)
                     if tool_name and text:
                         arg_dict = self.parse_str_json(text)
-                        if arg_dict:
+                        if arg_dict is not None:
                             result.tools_to_call.append((tool_name, arg_dict))
                     else:
                         logger.error(

@@ -107,6 +107,8 @@ class Giftia(Star):
         self.user_throttle_time = self.concurrent_config.get("user_throttle_time", 10)
         self.group_throttle_time = self.concurrent_config.get("group_throttle_time", 5)
         self.throttle_map: dict[str, float] = {}
+        # 接话分析窗口计数器 bot_name:group_or_user_id -> remaining_messages
+        self.active_reply_counters: dict[str, int] = {}
         # 防抖字典
         self.user_debounce_time = self.concurrent_config.get("user_debounce_time", 3)
         self.user_max_debounce_time = self.concurrent_config.get(
@@ -736,6 +738,7 @@ caption: {media_caption.caption}"""
             else:
                 self.debounce_at_map[debounce_key] = is_just_at
 
+        decrement_counter = False
         if not is_just_at:
             if not decision_conf.get("enabled", True) or not (
                 decision_conf.get("provider_ids") or decision_conf.get("provider_id")
@@ -746,6 +749,69 @@ caption: {media_caption.caption}"""
                 "group_whitelist"
             ) and group_or_user_id not in decision_conf.get("group_whitelist"):
                 logger.debug("没有at机器人且当前群组不在决策白名单内，跳过处理")
+                return
+
+            # Active window & proactive probability check
+            fmt_key = f"{bot_name}:{group_or_user_id}"
+            active_counter = self.active_reply_counters.get(fmt_key, 0)
+            proactive_prob = decision_conf.get("proactive_probability", 0)
+
+            is_active_window = active_counter > 0
+            is_proactive_hit = False
+            is_keyword_hit = False
+
+            if is_active_window:
+                decrement_counter = True
+            else:
+                is_proactive_hit = (
+                    proactive_prob > 0 and random.randint(1, 100) <= proactive_prob
+                )
+
+                # Keyword trigger check
+                if (
+                    not is_proactive_hit
+                    and decision_conf.get("keyword_trigger_enabled", False)
+                    and current_message.content
+                ):
+                    content_lower = current_message.content.lower()
+                    keyword_rules = decision_conf.get("keyword_rules", [])
+                    default_prob = decision_conf.get("keyword_default_probability", 100)
+
+                    for rule_str in keyword_rules:
+                        if not rule_str or not isinstance(rule_str, str):
+                            continue
+                        if ":" in rule_str:
+                            keywords_str, prob_str = rule_str.split(":", 1)
+                            prob = prob_str.strip()
+                        else:
+                            keywords_str = rule_str
+                            prob = default_prob
+
+                        kw_list = [
+                            k.strip()
+                            for k in re.split(r"[,，]", keywords_str)
+                            if k.strip()
+                        ]
+                        for kw in kw_list:
+                            if kw.lower() in content_lower:
+                                try:
+                                    prob_val = int(prob)
+                                except (ValueError, TypeError):
+                                    prob_val = default_prob
+
+                                if random.randint(1, 100) <= prob_val:
+                                    is_keyword_hit = True
+                                    logger.info(
+                                        f"{bot_name} 匹配到兴趣关键词 '{kw}'，触发接话决策"
+                                    )
+                                break
+                        if is_keyword_hit:
+                            break
+
+            if not is_active_window and not is_proactive_hit and not is_keyword_hit:
+                logger.debug(
+                    "没有at机器人且不满足接话分析窗口、主动概率或关键词触发，跳过处理"
+                )
                 return
 
         # 跳过没有文本也没有图片的消息
@@ -906,6 +972,14 @@ caption: {media_caption.caption}"""
                     if not provider_ids:
                         logger.error(f"{bot_name} 未配置决策模型ID")
                         return None
+                    if decrement_counter:
+                        fmt_key = f"{bot_name}:{group_or_user_id}"
+                        self.active_reply_counters[fmt_key] = max(
+                            0, self.active_reply_counters.get(fmt_key, 0) - 1
+                        )
+                        logger.debug(
+                            f"{bot_name} 消耗接话分析窗口次数，当前群组剩余分析次数: {self.active_reply_counters[fmt_key]}"
+                        )
                     result = await self.call_llm.call_llm_decision(
                         provider_ids=provider_ids,
                         system_prompt=decision_conf.get("decision_prompt"),
@@ -983,6 +1057,7 @@ caption: {media_caption.caption}"""
             self.replying_status[reply_key] = self.replying_status.get(reply_key, 0) + 1
 
         try:
+            has_sent_reply = False
             async for chunk in self.dispatch_llm_reply(
                 event=event,
                 bot_name=bot_name,
@@ -1001,8 +1076,18 @@ caption: {media_caption.caption}"""
                         group_or_user_id=group_or_user_id,
                         llm_result=chunk,
                     )
+                    if chunk.msg_chains:
+                        has_sent_reply = True
                 else:
                     logger.error(f"{bot_name} 生成消息失败，收到空消息块")
+
+            if has_sent_reply:
+                fmt_key = f"{bot_name}:{group_or_user_id}"
+                window_size = decision_conf.get("reply_active_window", 10)
+                self.active_reply_counters[fmt_key] = window_size
+                logger.info(
+                    f"{bot_name} 机器人发言，重置接话分析窗口计数为 {window_size}"
+                )
         finally:
             self.replying_status[reply_key] = max(
                 0, self.replying_status.get(reply_key, 0) - 1
@@ -1834,6 +1919,7 @@ caption: {media_caption.caption}"""
             unified_msg_origin=unified_msg_origin,
             adapter_id=adapter_id,
         )
+        has_sent_reply = False
         async for chunk in self.dispatch_llm_reply(
             event=mock_event,
             bot_name=bot_name,
@@ -1851,6 +1937,8 @@ caption: {media_caption.caption}"""
                             group_or_user_id=group_or_user_id,
                             llm_result=chunk,
                         )
+                        if chunk.msg_chains:
+                            has_sent_reply = True
                         continue
                 # 降级到普通消息发送
                 if not chunk.msg_chains:
@@ -1859,8 +1947,19 @@ caption: {media_caption.caption}"""
                     await self.context.send_message(
                         unified_msg_origin, MessageChain(msg_chain)
                     )
+                    has_sent_reply = True
             else:
                 logger.error(f"{bot_name} 定时任务调度失败，未获取到回复内容")
+
+        if has_sent_reply:
+            fmt_key = f"{bot_name}:{group_or_user_id}"
+            bot_conf = self.bot_map.get(bot_name, {})
+            decision_conf = bot_conf.get("decision_conf", {})
+            window_size = decision_conf.get("reply_active_window", 10)
+            self.active_reply_counters[fmt_key] = window_size
+            logger.info(
+                f"{bot_name} 定时任务发言，重置接话分析窗口计数为 {window_size}"
+            )
 
     def fake_event(
         self,
