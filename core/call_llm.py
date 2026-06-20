@@ -1,6 +1,7 @@
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.star import Context
+from astrbot.core.exceptions import EmptyModelOutputError
 
 from .schemas import (
     Decision,
@@ -156,10 +157,18 @@ class CallLLM:
                             llm_resp.completion_text, group_or_user_id
                         )
                         return result
-                    logger.error(
-                        f"LLM回复失败: {str(llm_resp)[:1024]}，provider_id: {provider_id}"
+                    else:
+                        # LLM succeeded but completion text is empty; treat as no reply needed.
+                        logger.info(
+                            f"LLM returned empty completion, treating as no reply. provider_id: {provider_id}"
+                        )
+                        return XmlLlmResult()
+                except EmptyModelOutputError:
+                    # Gemini empty output error; treat as no reply needed.
+                    logger.info(
+                        f"LLM generated empty output error, treating as no reply. provider_id: {provider_id}"
                     )
-                    continue
+                    return XmlLlmResult()
                 except Exception as e:
                     logger.error(f"LLM回复失败: {str(e)}，provider_id: {provider_id}")
                     continue
