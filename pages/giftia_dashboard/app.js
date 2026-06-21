@@ -81,23 +81,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Helper: Make API calls with fallback
-    function apiGet(endpoint, params) {
+    async function apiGet(endpoint, params) {
+        console.log(`[Giftia Debug] apiGet called: ${endpoint}`, params);
         if (window.AstrBotPluginPage) {
-            return window.AstrBotPluginPage.apiGet(endpoint, params);
+            try {
+                const res = await window.AstrBotPluginPage.apiGet(endpoint, params);
+                console.log(`[Giftia Debug] apiGet raw bridge response for ${endpoint}:`, res);
+                if (res && typeof res === "object" && "status" in res) {
+                    console.log(`[Giftia Debug] apiGet returning status-wrapped res directly:`, res);
+                    return res;
+                }
+                const formatted = { status: "success", data: res };
+                console.log(`[Giftia Debug] apiGet returning formatted:`, formatted);
+                return formatted;
+            } catch (e) {
+                console.error(`[Giftia Debug] apiGet bridge error for ${endpoint}:`, e);
+                return { status: "error", message: e.message };
+            }
         }
+        console.log(`[Giftia Debug] apiGet fallback fetching for ${endpoint}`);
         return fetch(`${endpoint}?${new URLSearchParams(params)}`).then(r => r.json());
     }
 
-    function apiPost(endpoint, body) {
+    async function apiPost(endpoint, body) {
+        console.log(`[Giftia Debug] apiPost called: ${endpoint}`, body);
         if (window.AstrBotPluginPage) {
-            return window.AstrBotPluginPage.apiPost(endpoint, body);
+            try {
+                const res = await window.AstrBotPluginPage.apiPost(endpoint, body);
+                console.log(`[Giftia Debug] apiPost raw bridge response for ${endpoint}:`, res);
+                if (res && typeof res === "object" && "status" in res) {
+                    console.log(`[Giftia Debug] apiPost returning status-wrapped res directly:`, res);
+                    return res;
+                }
+                const formatted = { status: "success", data: res };
+                console.log(`[Giftia Debug] apiPost returning formatted:`, formatted);
+                return formatted;
+            } catch (e) {
+                console.error(`[Giftia Debug] apiPost bridge error for ${endpoint}:`, e);
+                return { status: "error", message: e.message };
+            }
         }
+        console.log(`[Giftia Debug] apiPost fallback fetching for ${endpoint}`);
         return fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
         }).then(r => r.json());
     }
+
 
     // Filter Listeners (Debounced)
     let filterTimeout;
@@ -157,6 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(res.message || "请求失败");
             }
         } catch (e) {
+            console.error("[Giftia Debug] loadChatHistory error:", e);
             listContainer.innerHTML = `<tr><td colspan="6" class="no-data-row">⚠️ 加载数据失败: ${e.message}</td></tr>`;
         }
     }
@@ -235,6 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(res.message || "请求失败");
             }
         } catch (e) {
+            console.error("[Giftia Debug] loadMemories error:", e);
             listContainer.innerHTML = `<tr><td colspan="5" class="no-data-row">⚠️ 加载数据失败: ${e.message}</td></tr>`;
         }
     }
@@ -285,6 +318,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(res.message || "请求失败");
             }
         } catch (e) {
+            console.error("[Giftia Debug] loadBotStatus error:", e);
             container.innerHTML = `<div class="no-data-row flex-grow">⚠️ 加载状态失败: ${e.message}</div>`;
         }
     }
@@ -363,6 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error(res.message || "请求失败");
             }
         } catch (e) {
+            console.error("[Giftia Debug] loadMedia error:", e);
             container.innerHTML = `<div class="no-data-row flex-grow">⚠️ 加载失败: ${e.message}</div>`;
         }
     }
