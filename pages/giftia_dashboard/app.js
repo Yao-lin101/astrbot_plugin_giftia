@@ -148,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         try {
-            const res = await apiGet("/astrbot_plugin_giftia/chat_history", params);
+            const res = await apiGet("/chat_history", params);
             if (res.status === "success" && res.data) {
                 pagination.history.total = res.data.total;
                 renderChatHistory(res.data.items);
@@ -226,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         try {
-            const res = await apiGet("/astrbot_plugin_giftia/memories", params);
+            const res = await apiGet("/memories", params);
             if (res.status === "success" && res.data) {
                 pagination.memories.total = res.data.total;
                 renderMemories(res.data.items);
@@ -278,7 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
         container.innerHTML = `<div class="loading-row flex-grow"><span class="loader"></span> 加载状态中...</div>`;
 
         try {
-            const res = await apiGet("/astrbot_plugin_giftia/status");
+            const res = await apiGet("/status");
             if (res.status === "success" && res.data) {
                 renderBotStatus(res.data);
             } else {
@@ -354,7 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
         };
 
         try {
-            const res = await apiGet("/astrbot_plugin_giftia/media", params);
+            const res = await apiGet("/media", params);
             if (res.status === "success" && res.data) {
                 pagination.media.total = res.data.total;
                 renderMedia(res.data.items);
@@ -454,7 +454,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         try {
-            const res = await apiPost("/astrbot_plugin_giftia/memories/add", {
+            const res = await apiPost("/memories/add", {
                 bot_name: botName,
                 group_or_user_id: groupId,
                 text: text,
@@ -494,7 +494,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         try {
-            const res = await apiPost("/astrbot_plugin_giftia/memories/update", {
+            const res = await apiPost("/memories/update", {
                 memory_id: id,
                 bot_name: bot,
                 group_or_user_id: group,
@@ -519,7 +519,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         try {
-            const res = await apiPost("/astrbot_plugin_giftia/memories/delete", { memory_id: id });
+            const res = await apiPost("/memories/delete", { memory_id: id });
             if (res.status === "success") {
                 showToast("记忆删除成功");
                 loadMemories();
@@ -562,7 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         try {
-            const res = await apiPost("/astrbot_plugin_giftia/media/update", {
+            const res = await apiPost("/media/update", {
                 hash_val: hash,
                 caption: caption
             });
@@ -584,7 +584,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         try {
-            const res = await apiPost("/astrbot_plugin_giftia/media/delete", { hash_val: hash });
+            const res = await apiPost("/media/delete", { hash_val: hash });
             if (res.status === "success") {
                 showToast("媒体描述已清理");
                 loadMedia();
@@ -599,7 +599,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 6. Fill energy
     window.fillEnergy = async function(bot, group) {
         try {
-            const res = await apiPost("/astrbot_plugin_giftia/status/fill_energy", {
+            const res = await apiPost("/status/fill_energy", {
                 bot_name: bot,
                 group_or_user_id: group
             });
@@ -630,7 +630,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const state = document.getElementById("edit-status-state").value.trim();
 
         try {
-            const res = await apiPost("/astrbot_plugin_giftia/status/update", {
+            const res = await apiPost("/status/update", {
                 bot_name: bot,
                 group_or_user_id: group,
                 mood: mood,
