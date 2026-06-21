@@ -568,21 +568,20 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // 3. Delete Memory
-    window.deleteMemory = async function(id) {
-        if (!confirm("确定要删除这条长期记忆吗？此操作无法撤销。")) {
-            return;
-        }
-        try {
-            const res = await apiPost("/memories/delete", { memory_id: id });
-            if (res.status === "success") {
-                showToast("记忆删除成功");
-                loadMemories();
-            } else {
-                showToast(`删除失败: ${res.message}`);
+    window.deleteMemory = function(id) {
+        showConfirm("确认删除长期记忆", "确定要删除这条长期记忆吗？此操作无法撤销。", async () => {
+            try {
+                const res = await apiPost("/memories/delete", { memory_id: id });
+                if (res.status === "success") {
+                    showToast("记忆删除成功");
+                    loadMemories();
+                } else {
+                    showToast(`删除失败: ${res.message}`);
+                }
+            } catch (e) {
+                showToast(`发生错误: ${e.message}`);
             }
-        } catch (e) {
-            showToast(`发生错误: ${e.message}`);
-        }
+        });
     };
 
     // 4. Edit Media Caption
@@ -633,21 +632,20 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // 5. Delete Media Caption
-    window.deleteMedia = async function(hash) {
-        if (!confirm("确定要清理这条媒体缓存吗？这将清空它的大模型文字转述内容。")) {
-            return;
-        }
-        try {
-            const res = await apiPost("/media/delete", { hash_val: hash });
-            if (res.status === "success") {
-                showToast("媒体描述已清理");
-                loadMedia();
-            } else {
-                showToast(`清理失败: ${res.message}`);
+    window.deleteMedia = function(hash) {
+        showConfirm("确认清理媒体缓存", "确定要清理这条媒体缓存吗？这将清空它的大模型文字转述内容。", async () => {
+            try {
+                const res = await apiPost("/media/delete", { hash_val: hash });
+                if (res.status === "success") {
+                    showToast("媒体描述已清理");
+                    loadMedia();
+                } else {
+                    showToast(`清理失败: ${res.message}`);
+                }
+            } catch (e) {
+                showToast(`发生错误: ${e.message}`);
             }
-        } catch (e) {
-            showToast(`发生错误: ${e.message}`);
-        }
+        });
     };
 
     // 6. Fill energy
@@ -960,25 +958,24 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    window.deleteUserProfile = async function(bot, group, user) {
-        if (!confirm("确定要删除该用户的画像总结吗？此操作不可逆。")) {
-            return;
-        }
-        try {
-            const res = await apiPost("/profiles/user/delete", {
-                bot_name: bot,
-                group_or_user_id: group,
-                user_id: user
-            });
-            if (res.status === "success") {
-                showToast("删除画像成功");
-                loadUserProfiles();
-            } else {
-                showToast(`删除失败: ${res.message}`);
+    window.deleteUserProfile = function(bot, group, user) {
+        showConfirm("确认删除用户画像", "确定要删除该用户的画像总结吗？此操作不可逆。", async () => {
+            try {
+                const res = await apiPost("/profiles/user/delete", {
+                    bot_name: bot,
+                    group_or_user_id: group,
+                    user_id: user
+                });
+                if (res.status === "success") {
+                    showToast("删除画像成功");
+                    loadUserProfiles();
+                } else {
+                    showToast(`删除失败: ${res.message}`);
+                }
+            } catch (e) {
+                showToast(`发生错误: ${e.message}`);
             }
-        } catch (e) {
-            showToast(`发生错误: ${e.message}`);
-        }
+        });
     };
 
     window.openEditGroupProfileModal = function(bot, group, profileEncoded) {
@@ -1017,23 +1014,47 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    window.deleteGroupProfile = async function(bot, group) {
-        if (!confirm("确定要删除该群聊的画像总结吗？此操作不可逆。")) {
-            return;
-        }
-        try {
-            const res = await apiPost("/profiles/group/delete", {
-                bot_name: bot,
-                group_or_user_id: group
-            });
-            if (res.status === "success") {
-                showToast("删除画像成功");
-                loadGroupProfiles();
-            } else {
-                showToast(`删除失败: ${res.message}`);
+    window.deleteGroupProfile = function(bot, group) {
+        showConfirm("确认删除群聊画像", "确定要删除该群聊的画像总结吗？此操作不可逆。", async () => {
+            try {
+                const res = await apiPost("/profiles/group/delete", {
+                    bot_name: bot,
+                    group_or_user_id: group
+                });
+                if (res.status === "success") {
+                    showToast("删除画像成功");
+                    loadGroupProfiles();
+                } else {
+                    showToast(`删除失败: ${res.message}`);
+                }
+            } catch (e) {
+                showToast(`发生错误: ${e.message}`);
             }
-        } catch (e) {
-            showToast(`发生错误: ${e.message}`);
-        }
+        });
     };
+
+    // Custom Confirm Modal Logic
+    let confirmCallback = null;
+
+    window.showConfirm = function(title, message, callback) {
+        document.getElementById("confirm-title").textContent = title;
+        document.getElementById("confirm-message").textContent = message;
+        confirmCallback = callback;
+        openModal("confirm-modal");
+    };
+
+    window.closeConfirmModal = function() {
+        closeModal("confirm-modal");
+        confirmCallback = null;
+    };
+
+    const confirmBtnOk = document.getElementById("confirm-btn-ok");
+    if (confirmBtnOk) {
+        confirmBtnOk.addEventListener("click", () => {
+            if (confirmCallback) {
+                confirmCallback();
+            }
+            closeConfirmModal();
+        });
+    }
 });

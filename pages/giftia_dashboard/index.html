@@ -446,6 +446,23 @@
         </div>
     </div>
 
+    <!-- MODAL: Custom Confirm Dialog -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-card card" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2 id="confirm-title">确认操作</h2>
+                <button class="modal-close-btn" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" style="font-size: 15px; color: var(--font-secondary); margin-bottom: 8px;">确定要执行此操作吗？</p>
+            </div>
+            <div class="modal-footer" style="padding-top: 12px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 8px;">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">取消</button>
+                <button class="btn btn-danger" id="confirm-btn-ok">确认</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Feedback Message Toast -->
     <div id="toast-message" class="toast">提示信息</div>
 </body>
