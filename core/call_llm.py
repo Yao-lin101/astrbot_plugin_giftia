@@ -81,9 +81,15 @@ class CallLLM:
                         logger.info(
                             f"\n<completion>\n{llm_resp.completion_text}\n</completion>"
                         )
-                        return self.xml_parse.decode_decision_xml(
+                        result = self.xml_parse.decode_decision_xml(
                             llm_resp.completion_text
                         )
+                        if result is not None:
+                            return result
+                        logger.warning(
+                            f"LLM 决策 XML 解析失败，准备重试。provider_id: {provider_id}"
+                        )
+                        continue
                     logger.error(f"LLM回复失败: {str(llm_resp)[:1024]}")
                     continue
                 except Exception as e:

@@ -570,6 +570,8 @@ class XmlParse:
             "delete_task",
             "all_task",
             "add_sticker",
+            "decision",
+            "caption",
         ]
         pattern = r"<\s*(/?)\s*(" + "|".join(flat_tags) + r")\b([^>]*?)(/?)\s*>"
 
