@@ -1,0 +1,485 @@
+import json
+import time
+from datetime import datetime
+
+from astrbot.api import logger
+from astrbot.api.web import error_response, json_response, request
+
+
+class GiftiaWebApi:
+    """Giftia plugin web APIs for dashboard pages."""
+
+    def __init__(self, giftia):
+        self.giftia = giftia
+
+    async def get_chat_history(self):
+        """Get chat logs with pagination and filters."""
+        try:
+            page = int(request.query.get("page", 1))
+            limit = int(request.query.get("limit", 20))
+            bot_name = request.query.get("bot_name")
+            group_or_user_id = request.query.get("group_or_user_id")
+            reply_decision = request.query.get("reply_decision")
+            use_rag = request.query.get("use_rag")
+            search = request.query.get("search")
+
+            offset = (page - 1) * limit
+            conditions = []
+            params = []
+
+            if bot_name:
+                conditions.append("bot_name = ?")
+                params.append(bot_name)
+            if group_or_user_id:
+                conditions.append("group_or_user_id = ?")
+                params.append(group_or_user_id)
+            if reply_decision is not None and reply_decision != "":
+                conditions.append("reply_decision = ?")
+                params.append(int(reply_decision))
+            if use_rag is not None and use_rag != "":
+                conditions.append("use_rag = ?")
+                params.append(int(use_rag))
+            if search:
+                conditions.append("content LIKE ?")
+                params.append(f"%{search}%")
+
+            where_clause = ""
+            if conditions:
+                where_clause = "WHERE " + " AND ".join(conditions)
+
+            # Query count
+            count_sql = f"SELECT COUNT(*) as total FROM chat_history {where_clause}"
+            async with self.giftia.db.conn.execute(count_sql, params) as cursor:
+                row = await cursor.fetchone()
+                total = row["total"] if row else 0
+
+            # Query data
+            data_sql = f"""
+                SELECT id, bot_name, group_or_user_id, nickname, user_id, message_id,
+                       content, media_ids, role, reply_decision, use_rag, is_recalled, created_at
+                FROM chat_history
+                {where_clause}
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """
+            data_params = params + [limit, offset]
+            items = []
+            async with self.giftia.db.conn.execute(data_sql, data_params) as cursor:
+                rows = await cursor.fetchall()
+                for r in rows:
+                    items.append(
+                        {
+                            "id": r["id"],
+                            "bot_name": r["bot_name"],
+                            "group_or_user_id": r["group_or_user_id"],
+                            "nickname": r["nickname"],
+                            "user_id": r["user_id"],
+                            "message_id": r["message_id"],
+                            "content": r["content"],
+                            "media_ids": json.loads(r["media_ids"])
+                            if r["media_ids"]
+                            else [],
+                            "role": r["role"],
+                            "reply_decision": r["reply_decision"],
+                            "use_rag": r["use_rag"],
+                            "is_recalled": r["is_recalled"],
+                            "created_at": r["created_at"],
+                        }
+                    )
+
+            return json_response(
+                {
+                    "status": "success",
+                    "data": {
+                        "items": items,
+                        "total": total,
+                        "page": page,
+                        "limit": limit,
+                    },
+                }
+            )
+        except Exception as e:
+            logger.error(f"[Giftia API] get_chat_history error: {e}")
+            return error_response(f"获取聊天记录失败: {str(e)}")
+
+    async def get_media(self):
+        """Get media captions with pagination and filters."""
+        try:
+            page = int(request.query.get("page", 1))
+            limit = int(request.query.get("limit", 20))
+            media_type = request.query.get("media_type")
+            search = request.query.get("search")
+
+            offset = (page - 1) * limit
+            conditions = []
+            params = []
+
+            if media_type:
+                conditions.append("media_type = ?")
+                params.append(media_type)
+            if search:
+                conditions.append("(caption LIKE ? OR file_name LIKE ?)")
+                params.append(f"%{search}%")
+                params.append(f"%{search}%")
+
+            where_clause = ""
+            if conditions:
+                where_clause = "WHERE " + " AND ".join(conditions)
+
+            # Query count
+            count_sql = f"SELECT COUNT(*) as total FROM media_caption {where_clause}"
+            async with self.giftia.db.conn.execute(count_sql, params) as cursor:
+                row = await cursor.fetchone()
+                total = row["total"] if row else 0
+
+            # Query data
+            data_sql = f"""
+                SELECT id, hash_val, file_name, url, media_type, text, caption, query_times, created_at
+                FROM media_caption
+                {where_clause}
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """
+            data_params = params + [limit, offset]
+            items = []
+            async with self.giftia.db.conn.execute(data_sql, data_params) as cursor:
+                rows = await cursor.fetchall()
+                for r in rows:
+                    items.append(
+                        {
+                            "id": r["id"],
+                            "hash_val": r["hash_val"],
+                            "file_name": r["file_name"],
+                            "url": r["url"],
+                            "media_type": r["media_type"],
+                            "text": r["text"],
+                            "caption": r["caption"],
+                            "query_times": r["query_times"],
+                            "created_at": r["created_at"],
+                        }
+                    )
+
+            return json_response(
+                {
+                    "status": "success",
+                    "data": {
+                        "items": items,
+                        "total": total,
+                        "page": page,
+                        "limit": limit,
+                    },
+                }
+            )
+        except Exception as e:
+            logger.error(f"[Giftia API] get_media error: {e}")
+            return error_response(f"获取媒体转述列表失败: {str(e)}")
+
+    async def update_media(self):
+        """Update media caption text."""
+        try:
+            body = await request.json()
+            hash_val = body.get("hash_val")
+            caption = body.get("caption")
+
+            if not hash_val:
+                return error_response("缺少 hash_val 参数")
+
+            # Fetch existing cache to verify and update
+            media_caption = await self.giftia.data_cache.get_caption_by_hash(hash_val)
+            if not media_caption:
+                return error_response("媒体记录不存在")
+
+            media_caption.caption = caption
+
+            # Update DB
+            await self.giftia.db.conn.execute(
+                "UPDATE media_caption SET caption = ?, updated_at = ? WHERE hash_val = ?",
+                (caption, datetime.now().isoformat(), hash_val),
+            )
+            await self.giftia.db.conn.commit()
+
+            # Update cache
+            self.giftia.data_cache.caption[hash_val] = media_caption
+
+            return json_response({"status": "success", "message": "保存媒体描述成功"})
+        except Exception as e:
+            logger.error(f"[Giftia API] update_media error: {e}")
+            return error_response(f"修改媒体描述失败: {str(e)}")
+
+    async def delete_media(self):
+        """Delete media caption cache."""
+        try:
+            body = await request.json()
+            hash_val = body.get("hash_val")
+
+            if not hash_val:
+                return error_response("缺少 hash_val 参数")
+
+            # Delete from DB
+            await self.giftia.db.conn.execute(
+                "DELETE FROM media_caption WHERE hash_val = ?", (hash_val,)
+            )
+            await self.giftia.db.conn.commit()
+
+            # Remove from cache
+            self.giftia.data_cache.caption.pop(hash_val, None)
+
+            return json_response({"status": "success", "message": "删除媒体描述成功"})
+        except Exception as e:
+            logger.error(f"[Giftia API] delete_media error: {e}")
+            return error_response(f"删除媒体描述失败: {str(e)}")
+
+    async def get_memories(self):
+        """Get memories with pagination and filters."""
+        try:
+            page = int(request.query.get("page", 1))
+            limit = int(request.query.get("limit", 20))
+            bot_name = request.query.get("bot_name")
+            group_or_user_id = request.query.get("group_or_user_id")
+            search = request.query.get("search")
+
+            offset = (page - 1) * limit
+            conditions = []
+            params = []
+
+            if bot_name:
+                conditions.append("bot_name = ?")
+                params.append(bot_name)
+            if group_or_user_id:
+                conditions.append("group_or_user_id = ?")
+                params.append(group_or_user_id)
+            if search:
+                conditions.append("text LIKE ?")
+                params.append(f"%{search}%")
+
+            where_clause = ""
+            if conditions:
+                where_clause = "WHERE " + " AND ".join(conditions)
+
+            # Query count
+            count_sql = f"SELECT COUNT(*) as total FROM memories {where_clause}"
+            async with self.giftia.db.conn.execute(count_sql, params) as cursor:
+                row = await cursor.fetchone()
+                total = row["total"] if row else 0
+
+            # Query data
+            data_sql = f"""
+                SELECT id, bot_name, group_or_user_id, memory_id, text, metadata, created_at
+                FROM memories
+                {where_clause}
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """
+            data_params = params + [limit, offset]
+            items = []
+            async with self.giftia.db.conn.execute(data_sql, data_params) as cursor:
+                rows = await cursor.fetchall()
+                for r in rows:
+                    items.append(
+                        {
+                            "id": r["id"],
+                            "bot_name": r["bot_name"],
+                            "group_or_user_id": r["group_or_user_id"],
+                            "memory_id": r["memory_id"],
+                            "text": r["text"],
+                            "metadata": json.loads(r["metadata"])
+                            if r["metadata"]
+                            else {},
+                            "created_at": r["created_at"],
+                        }
+                    )
+
+            return json_response(
+                {
+                    "status": "success",
+                    "data": {
+                        "items": items,
+                        "total": total,
+                        "page": page,
+                        "limit": limit,
+                    },
+                }
+            )
+        except Exception as e:
+            logger.error(f"[Giftia API] get_memories error: {e}")
+            return error_response(f"获取记忆列表失败: {str(e)}")
+
+    async def add_memory(self):
+        """Add new memory item."""
+        try:
+            body = await request.json()
+            bot_name = body.get("bot_name")
+            group_or_user_id = body.get("group_or_user_id")
+            text = body.get("text")
+            user_id = body.get("user_id") or "admin"
+
+            if not bot_name or not group_or_user_id or not text:
+                return error_response("缺少必要参数 (bot_name, group_or_user_id, text)")
+
+            memory_id = await self.giftia.data_cache.add_memory(
+                bot_name=bot_name,
+                group_or_user_id=group_or_user_id,
+                text=text,
+                user_id=user_id,
+            )
+
+            if not memory_id:
+                return error_response("添加记忆失败，大模型 Embedding 出错")
+
+            return json_response(
+                {
+                    "status": "success",
+                    "message": "添加记忆成功",
+                    "data": {"memory_id": memory_id},
+                }
+            )
+        except Exception as e:
+            logger.error(f"[Giftia API] add_memory error: {e}")
+            return error_response(f"添加记忆失败: {str(e)}")
+
+    async def update_memory(self):
+        """Update existing memory text by replacing it."""
+        try:
+            body = await request.json()
+            memory_id = body.get("memory_id")
+            bot_name = body.get("bot_name")
+            group_or_user_id = body.get("group_or_user_id")
+            text = body.get("text")
+            user_id = body.get("user_id") or "admin"
+
+            if not memory_id or not bot_name or not group_or_user_id or not text:
+                return error_response("缺少必要参数")
+
+            # Delete old memory first
+            await self.giftia.data_cache.delete_memory(memory_id)
+
+            # Re-insert with updated text
+            new_memory_id = await self.giftia.data_cache.add_memory(
+                bot_name=bot_name,
+                group_or_user_id=group_or_user_id,
+                text=text,
+                user_id=user_id,
+            )
+
+            if not new_memory_id:
+                return error_response("更新记忆失败，大模型 Embedding 出错")
+
+            return json_response(
+                {
+                    "status": "success",
+                    "message": "更新记忆成功",
+                    "data": {"memory_id": new_memory_id},
+                }
+            )
+        except Exception as e:
+            logger.error(f"[Giftia API] update_memory error: {e}")
+            return error_response(f"更新记忆失败: {str(e)}")
+
+    async def delete_memory(self):
+        """Delete memory item."""
+        try:
+            body = await request.json()
+            memory_id = body.get("memory_id")
+
+            if not memory_id:
+                return error_response("缺少 memory_id 参数")
+
+            success = await self.giftia.data_cache.delete_memory(memory_id)
+            if not success:
+                return error_response("删除记忆失败")
+
+            return json_response({"status": "success", "message": "删除记忆成功"})
+        except Exception as e:
+            logger.error(f"[Giftia API] delete_memory error: {e}")
+            return error_response(f"删除记忆失败: {str(e)}")
+
+    async def get_bot_status(self):
+        """Get active bot status list."""
+        try:
+            sql = """
+                SELECT id, bot_name, group_or_user_id, mood, state, memory, action, energy, created_at, updated_at
+                FROM bot_status
+                ORDER BY updated_at DESC
+            """
+            items = []
+            async with self.giftia.db.conn.execute(sql) as cursor:
+                rows = await cursor.fetchall()
+                for r in rows:
+                    items.append(
+                        {
+                            "id": r["id"],
+                            "bot_name": r["bot_name"],
+                            "group_or_user_id": r["group_or_user_id"],
+                            "mood": r["mood"],
+                            "state": r["state"],
+                            "memory": r["memory"],
+                            "action": r["action"],
+                            "energy": r["energy"],
+                            "created_at": r["created_at"],
+                            "updated_at": r["updated_at"],
+                        }
+                    )
+
+            return json_response({"status": "success", "data": items})
+        except Exception as e:
+            logger.error(f"[Giftia API] get_bot_status error: {e}")
+            return error_response(f"获取状态列表失败: {str(e)}")
+
+    async def fill_energy(self):
+        """Replenish bot energy to max 100."""
+        try:
+            body = await request.json()
+            bot_name = body.get("bot_name")
+            group_or_user_id = body.get("group_or_user_id")
+
+            if not bot_name or not group_or_user_id:
+                return error_response("缺少必要参数")
+
+            fmt_key = f"{bot_name}:{group_or_user_id}"
+            status = self.giftia.data_cache.bot_status.get(fmt_key)
+            if not status:
+                status = await self.giftia.db.get_bot_status(group_or_user_id, bot_name)
+
+            status.energy = 100.0
+            status.energy_recovery_time = time.time()
+            self.giftia.data_cache.bot_status[fmt_key] = status
+
+            # Persist to database
+            await self.giftia.db.upsert_bot_status(group_or_user_id, bot_name, status)
+
+            return json_response(
+                {"status": "success", "message": f"成功为 {bot_name} 补充能量"}
+            )
+        except Exception as e:
+            logger.error(f"[Giftia API] fill_energy error: {e}")
+            return error_response(f"补充能量失败: {str(e)}")
+
+    async def update_bot_status(self):
+        """Update bot mood or active state."""
+        try:
+            body = await request.json()
+            bot_name = body.get("bot_name")
+            group_or_user_id = body.get("group_or_user_id")
+            mood = body.get("mood")
+            state = body.get("state")
+
+            if not bot_name or not group_or_user_id:
+                return error_response("缺少必要参数")
+
+            fmt_key = f"{bot_name}:{group_or_user_id}"
+            status = self.giftia.data_cache.bot_status.get(fmt_key)
+            if not status:
+                status = await self.giftia.db.get_bot_status(group_or_user_id, bot_name)
+
+            if mood is not None:
+                status.mood = mood
+            if state is not None:
+                status.state = state
+
+            self.giftia.data_cache.bot_status[fmt_key] = status
+            await self.giftia.db.upsert_bot_status(group_or_user_id, bot_name, status)
+
+            return json_response({"status": "success", "message": "更新 Bot 状态成功"})
+        except Exception as e:
+            logger.error(f"[Giftia API] update_bot_status error: {e}")
+            return error_response(f"更新 Bot 状态失败: {str(e)}")

@@ -217,6 +217,77 @@ class Giftia(Star):
             self.context.add_llm_tools(GetMessageContextTool(plugin=self))
             logger.info("已注册函数调用工具: get_message_context")
 
+        # 注册 Web API
+        from .core.web_api import GiftiaWebApi
+
+        self.web_api = GiftiaWebApi(self)
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/media",
+            view_handler=self.web_api.get_media,
+            methods=["GET"],
+            desc="Get media captions list",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/media/update",
+            view_handler=self.web_api.update_media,
+            methods=["POST"],
+            desc="Update media caption text",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/media/delete",
+            view_handler=self.web_api.delete_media,
+            methods=["POST"],
+            desc="Delete media caption",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/memories",
+            view_handler=self.web_api.get_memories,
+            methods=["GET"],
+            desc="Get memories list",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/memories/add",
+            view_handler=self.web_api.add_memory,
+            methods=["POST"],
+            desc="Add new memory",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/memories/update",
+            view_handler=self.web_api.update_memory,
+            methods=["POST"],
+            desc="Update memory text",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/memories/delete",
+            view_handler=self.web_api.delete_memory,
+            methods=["POST"],
+            desc="Delete memory",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/status",
+            view_handler=self.web_api.get_bot_status,
+            methods=["GET"],
+            desc="Get bot status list",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/status/fill_energy",
+            view_handler=self.web_api.fill_energy,
+            methods=["POST"],
+            desc="Fill bot energy",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/status/update",
+            view_handler=self.web_api.update_bot_status,
+            methods=["POST"],
+            desc="Update bot mood/state",
+        )
+        self.context.register_web_api(
+            route="/astrbot_plugin_giftia/chat_history",
+            view_handler=self.web_api.get_chat_history,
+            methods=["GET"],
+            desc="Get chat history list",
+        )
+
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("工具列表")
     async def tool_list(self, event: AstrMessageEvent, index: int = 1):
