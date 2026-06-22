@@ -1127,11 +1127,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Cache Cleanup Modal & Logic
     window.openCleanCacheModal = async function() {
-        const genreSelect = document.getElementById("clean-media-genre");
-        // Reset options to default
-        genreSelect.innerHTML = '<option value="all">全部</option>';
+        const container = document.getElementById("clean-media-genre-container");
+        container.innerHTML = '<div style="font-size: 12px; color: var(--font-secondary);">加载中...</div>';
+        
         document.getElementById("clean-media-type").value = "all";
         document.getElementById("clean-max-query-times").value = "0";
+        document.getElementById("clean-genre-exclude").checked = false;
         document.getElementById("clean-cache-preview-info").innerHTML = '点击下方“计算清理空间”进行预估...';
         document.getElementById("clean-cache-preview-info").style.borderLeftColor = "var(--border-color)";
 
@@ -1139,19 +1140,74 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await apiGet("/media/genres");
             if (res && res.status === "success" && res.genres) {
-                res.genres.forEach(genre => {
-                    const option = document.createElement("option");
-                    option.value = genre;
-                    option.textContent = genre;
-                    genreSelect.appendChild(option);
+                container.innerHTML = "";
+                
+                // Add unspecified option
+                const unspecifiedDiv = document.createElement("div");
+                unspecifiedDiv.style.display = "flex";
+                unspecifiedDiv.style.alignItems = "center";
+                unspecifiedDiv.style.gap = "6px";
+                unspecifiedDiv.style.margin = "4px 0";
+                unspecifiedDiv.innerHTML = `
+                    <input type="checkbox" id="clean-genre-unspecified" value="" checked>
+                    <label for="clean-genre-unspecified" style="margin: 0; cursor: pointer; font-weight: normal; color: var(--font-primary);">[未指定风格]</label>
+                `;
+                container.appendChild(unspecifiedDiv);
+
+                res.genres.forEach((genre, idx) => {
+                    const genreDiv = document.createElement("div");
+                    genreDiv.style.display = "flex";
+                    genreDiv.style.alignItems = "center";
+                    genreDiv.style.gap = "6px";
+                    genreDiv.style.margin = "4px 0";
+                    genreDiv.innerHTML = `
+                        <input type="checkbox" name="clean-genre-checkbox" id="clean-genre-chk-${idx}" value="${escapeHtml(genre)}" checked>
+                        <label for="clean-genre-chk-${idx}" style="margin: 0; cursor: pointer; font-weight: normal; color: var(--font-primary);">${escapeHtml(genre)}</label>
+                    `;
+                    container.appendChild(genreDiv);
                 });
+            } else {
+                container.innerHTML = '<div style="font-size: 12px; color: var(--font-secondary);">暂无可用风格，或加载失败。</div>';
             }
         } catch (e) {
             console.error("Failed to load genres for cleanup modal:", e);
+            container.innerHTML = '<div style="font-size: 12px; color: var(--font-secondary);">加载风格列表出错。</div>';
         }
 
         openModal("clean-cache-modal");
     };
+
+    window.toggleAllCleanGenres = function(checked) {
+        const unspecified = document.getElementById("clean-genre-unspecified");
+        if (unspecified) unspecified.checked = checked;
+        
+        const checkboxes = document.getElementsByName("clean-genre-checkbox");
+        checkboxes.forEach(chk => chk.checked = checked);
+    };
+
+    window.invertCleanGenres = function() {
+        const unspecified = document.getElementById("clean-genre-unspecified");
+        if (unspecified) unspecified.checked = !unspecified.checked;
+        
+        const checkboxes = document.getElementsByName("clean-genre-checkbox");
+        checkboxes.forEach(chk => chk.checked = !chk.checked);
+    };
+
+    function getSelectedCleanGenres() {
+        const selected = [];
+        const unspecified = document.getElementById("clean-genre-unspecified");
+        if (unspecified && unspecified.checked) {
+            selected.push(""); // empty string represents unspecified in backend
+        }
+        
+        const checkboxes = document.getElementsByName("clean-genre-checkbox");
+        checkboxes.forEach(chk => {
+            if (chk.checked) {
+                selected.push(chk.value);
+            }
+        });
+        return selected;
+    }
 
     function formatBytes(bytes) {
         if (bytes === 0) return "0 字节";
@@ -1163,7 +1219,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.calculateCleanSpace = async function() {
         const mediaType = document.getElementById("clean-media-type").value;
-        const genre = document.getElementById("clean-media-genre").value;
+        const genres = getSelectedCleanGenres();
+        const excludeGenres = document.getElementById("clean-genre-exclude").checked;
         const maxQueryTimesVal = document.getElementById("clean-max-query-times").value.trim();
         const maxQueryTimes = maxQueryTimesVal !== "" ? parseInt(maxQueryTimesVal, 10) : null;
 
@@ -1174,7 +1231,8 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const res = await apiPost("/media/cache/clean", {
                 media_type: mediaType,
-                genre: genre,
+                genres: genres,
+                exclude_genres: excludeGenres,
                 max_query_times: maxQueryTimes,
                 dry_run: true
             });
@@ -1194,7 +1252,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window.submitCleanCache = async function() {
         const mediaType = document.getElementById("clean-media-type").value;
-        const genre = document.getElementById("clean-media-genre").value;
+        const genres = getSelectedCleanGenres();
+        const excludeGenres = document.getElementById("clean-genre-exclude").checked;
         const maxQueryTimesVal = document.getElementById("clean-max-query-times").value.trim();
         const maxQueryTimes = maxQueryTimesVal !== "" ? parseInt(maxQueryTimesVal, 10) : null;
 
@@ -1202,7 +1261,8 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const res = await apiPost("/media/cache/clean", {
                     media_type: mediaType,
-                    genre: genre,
+                    genres: genres,
+                    exclude_genres: excludeGenres,
                     max_query_times: maxQueryTimes,
                     dry_run: false
                 });

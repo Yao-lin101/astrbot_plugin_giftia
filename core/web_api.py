@@ -958,7 +958,6 @@ class GiftiaWebApi:
         try:
             body = await request.json()
             media_type = body.get("media_type", "all")
-            genre = body.get("genre", "all")
             max_query_times = body.get("max_query_times")
             dry_run = body.get("dry_run", False)
 
@@ -970,9 +969,42 @@ class GiftiaWebApi:
             elif media_type == "audio":
                 conditions.append("media_type IN ('audio', 'voice')")
 
-            if genre and genre != "all":
-                conditions.append("genre = ?")
-                params.append(genre)
+            genres = body.get("genres")
+            exclude_genres = body.get("exclude_genres", False)
+
+            if genres is not None:
+                if not exclude_genres and not genres:
+                    conditions.append("1 = 0")
+                elif genres:
+                    has_unspecified = "" in genres
+                    specified_genres = [g for g in genres if g != ""]
+
+                    if not exclude_genres:
+                        if specified_genres:
+                            placeholders = ",".join(["?"] * len(specified_genres))
+                            if has_unspecified:
+                                conditions.append(
+                                    f"(genre IN ({placeholders}) OR genre IS NULL OR genre = '')"
+                                )
+                            else:
+                                conditions.append(f"genre IN ({placeholders})")
+                            params.extend(specified_genres)
+                        else:
+                            conditions.append("(genre IS NULL OR genre = '')")
+                    else:
+                        if specified_genres:
+                            placeholders = ",".join(["?"] * len(specified_genres))
+                            if has_unspecified:
+                                conditions.append(
+                                    f"(genre NOT IN ({placeholders}) AND genre IS NOT NULL AND genre != '')"
+                                )
+                            else:
+                                conditions.append(
+                                    f"(genre NOT IN ({placeholders}) OR genre IS NULL OR genre = '')"
+                                )
+                            params.extend(specified_genres)
+                        else:
+                            conditions.append("genre IS NOT NULL AND genre != ''")
 
             if max_query_times is not None:
                 try:
