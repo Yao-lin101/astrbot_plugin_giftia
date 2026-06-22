@@ -457,8 +457,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                     <div class="media-info">
                         <div class="media-caption-text">${escapeHtml(item.caption || "暂无描述内容")}</div>
-                        <div style="margin-top: 8px; font-size: 11px; color: var(--font-secondary); word-break: break-all;">
-                            <strong>Hash:</strong> ${item.hash_val}
+                        <div style="margin-top: 8px; font-size: 11px; color: var(--font-secondary);">
+                            <strong>风格类型:</strong> ${escapeHtml(item.genre || "未知")}
                         </div>
                         <div style="font-size: 11px; color: var(--font-secondary);">
                             <strong>使用次数:</strong> ${item.query_times || 0} 次
