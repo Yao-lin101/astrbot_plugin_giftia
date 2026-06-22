@@ -1016,18 +1016,31 @@ html[data-theme="dark"] .sub-nav-tab.active {
 .edit-media-modal-card {
     max-width: 900px !important;
     width: 95% !important;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.edit-media-modal-card .modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-bottom: 0;
 }
 
 .edit-media-modal-body {
     display: flex;
     gap: 20px;
     width: 100%;
+    height: 100%;
+    min-height: 0;
 }
 
 .edit-media-left {
     flex: 1.2;
     display: flex;
     flex-direction: column;
+    min-height: 0;
 }
 
 .edit-media-right {
@@ -1035,20 +1048,41 @@ html[data-theme="dark"] .sub-nav-tab.active {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    overflow-y: auto;
+    padding-right: 8px;
 }
 
 .edit-media-left .media-preview-container {
+    flex: 1;
     height: 100%;
-    min-height: 380px;
+    min-height: 0;
     margin-bottom: 0;
 }
 
+.edit-media-left .media-preview-container img {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+}
+
 @media (max-width: 768px) {
+    .edit-media-modal-card {
+        max-height: none;
+    }
+    .edit-media-modal-card .modal-body {
+        overflow: visible;
+    }
     .edit-media-modal-body {
         flex-direction: column;
+        height: auto;
     }
     .edit-media-left .media-preview-container {
         min-height: 200px;
+        height: 200px;
+    }
+    .edit-media-right {
+        overflow-y: visible;
+        padding-right: 0;
     }
 }
 
