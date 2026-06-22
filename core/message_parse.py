@@ -277,11 +277,37 @@ class MessageParser:
 
             # 尝试从 url 或 file_name 提取 32位 MD5 作为稳定的 hash_val
             stable_hash = None
-            if file_name:
+
+            def is_temp_or_local_path(s: str | None) -> bool:
+                if not s:
+                    return False
+                if s.startswith(("http://", "https://")):
+                    return False
+                if s.startswith("file://") or any(
+                    marker in s
+                    for marker in [
+                        "media_image_",
+                        "media_audio_",
+                        "media_file_",
+                        "io_temp_img_",
+                        "compressed_",
+                    ]
+                ):
+                    return True
+                import os
+
+                try:
+                    if os.path.isabs(s) or os.path.exists(s):
+                        return True
+                except Exception:
+                    pass
+                return False
+
+            if file_name and not is_temp_or_local_path(file_name):
                 match = re.search(r"([a-fA-F0-9]{32})", file_name)
                 if match:
                     stable_hash = match.group(1).lower()
-            if not stable_hash and url:
+            if not stable_hash and url and not is_temp_or_local_path(url):
                 match = re.search(r"([a-fA-F0-9]{32})", url)
                 if match:
                     stable_hash = match.group(1).lower()
