@@ -1012,4 +1012,44 @@ html[data-theme="dark"] .sub-nav-tab.active {
     }
 }
 
+/* Edit Media Caption Modal Layout */
+.edit-media-modal-card {
+    max-width: 900px !important;
+    width: 95% !important;
+}
+
+.edit-media-modal-body {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+}
+
+.edit-media-left {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+}
+
+.edit-media-right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.edit-media-left .media-preview-container {
+    height: 100%;
+    min-height: 380px;
+    margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+    .edit-media-modal-body {
+        flex-direction: column;
+    }
+    .edit-media-left .media-preview-container {
+        min-height: 200px;
+    }
+}
+
 
