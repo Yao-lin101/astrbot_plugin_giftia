@@ -133,14 +133,14 @@ window.openEditMediaModal = function(hash, urlEncoded, type, captionEncoded, gen
     const tabsContainer = document.querySelector(".edit-media-tabs");
     if (tabsContainer) {
         tabsContainer.querySelectorAll(".media-tab-btn").forEach(b => {
-            if (b.getAttribute("data-mediatab") === "ocr") {
+            if (b.getAttribute("data-mediatab") === "caption") {
                 b.classList.add("active");
             } else {
                 b.classList.remove("active");
             }
         });
         tabsContainer.querySelectorAll(".media-tab-panel").forEach(p => {
-            if (p.id === "mediatab-ocr") {
+            if (p.id === "mediatab-caption") {
                 p.classList.add("active");
             } else {
                 p.classList.remove("active");

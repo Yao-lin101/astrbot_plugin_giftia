@@ -273,14 +273,21 @@ html[data-theme="dark"] .edit-media-tab-header {
     width: 100%;
     height: 100%;
     resize: none;
-    border: none;
-    background: transparent;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+    border-radius: 6px;
     outline: none;
-    padding: 0;
+    padding: 10px;
     font-size: 13px;
     line-height: 1.6;
     color: var(--font-color);
     font-family: inherit;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.media-tab-panel textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
 }
 
 @media (max-width: 768px) {
