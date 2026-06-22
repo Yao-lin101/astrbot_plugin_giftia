@@ -844,7 +844,7 @@ class GiftiaWebApi:
             except Exception as e:
                 logger.warning(f"[Giftia API] 无法从数据库获取媒体类型: {e}")
 
-            if not content_type:
+            if not content_type or content_type == "application/octet-stream":
                 # fallback: check magic bytes
                 try:
                     with open(cache_file, "rb") as f:
@@ -909,7 +909,7 @@ class GiftiaWebApi:
             except Exception as e:
                 logger.warning(f"[Giftia API] 无法从数据库获取媒体类型: {e}")
 
-            if not content_type:
+            if not content_type or content_type == "application/octet-stream":
                 try:
                     with open(cache_file, "rb") as f:
                         header = f.read(12)
@@ -988,7 +988,7 @@ class GiftiaWebApi:
             except Exception as e:
                 logger.warning(f"[Giftia API] 无法从数据库获取媒体类型: {e}")
 
-            if not content_type:
+            if not content_type or content_type == "application/octet-stream":
                 try:
                     with open(cache_file, "rb") as f:
                         header = f.read(12)
