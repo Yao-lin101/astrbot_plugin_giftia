@@ -5,6 +5,7 @@ from datetime import datetime
 
 from xxhash import xxh3_64_hexdigest
 
+from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api.message_components import (
     At,
@@ -331,7 +332,10 @@ class MessageParser:
             # 保存到本地持久缓存目录，以便网页端可以永久预览
             try:
                 from astrbot.core.star.star_tools import StarTools
-                cache_dir = StarTools.get_data_dir("astrbot_plugin_giftia") / "media_cache"
+
+                cache_dir = (
+                    StarTools.get_data_dir("astrbot_plugin_giftia") / "media_cache"
+                )
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 cache_file = cache_dir / hash_val
                 if not cache_file.exists():
@@ -406,7 +410,10 @@ class MessageParser:
                 audio_bytes = await self.http_manager.download_media(url)
                 if audio_bytes:
                     from astrbot.core.star.star_tools import StarTools
-                    cache_dir = StarTools.get_data_dir("astrbot_plugin_giftia") / "media_cache"
+
+                    cache_dir = (
+                        StarTools.get_data_dir("astrbot_plugin_giftia") / "media_cache"
+                    )
                     cache_dir.mkdir(parents=True, exist_ok=True)
                     cache_file = cache_dir / hash_val
                     if not cache_file.exists():

@@ -426,6 +426,40 @@ document.addEventListener("DOMContentLoaded", () => {
         loadMedia();
     }
 
+    async function loadMediaFileB64(hash, elementId, fallbackUrl, type) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+
+        try {
+            const res = await apiGet(`/media/file/b64/${hash}`);
+            if (res && res.status === "success" && res.base64) {
+                const mimeType = res.content_type || (type === "image" ? "image/jpeg" : "audio/mpeg");
+                el.src = `data:${mimeType};base64,${res.base64}`;
+            } else {
+                if (type === "image") {
+                    el.onerror = () => {
+                        el.onerror = null;
+                        el.src = 'placeholder.png';
+                    };
+                    el.src = fallbackUrl || 'placeholder.png';
+                } else if (fallbackUrl) {
+                    el.src = fallbackUrl;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load media base64 for hash:", hash, e);
+            if (type === "image") {
+                el.onerror = () => {
+                    el.onerror = null;
+                    el.src = 'placeholder.png';
+                };
+                el.src = fallbackUrl || 'placeholder.png';
+            } else if (fallbackUrl) {
+                el.src = fallbackUrl;
+            }
+        }
+    }
+
     function renderMedia(items) {
         const container = document.getElementById("media-list");
         if (!items || items.length === 0) {
@@ -435,11 +469,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         container.innerHTML = items.map(item => {
             let preview = "";
-            const mediaUrl = `/api/plug/astrbot_plugin_giftia/media/file/${item.hash_val}`;
+            const uniqueId = `media-preview-${item.hash_val}`;
             if (item.media_type === "image" && item.url) {
-                preview = `<img src="${mediaUrl}" alt="预览图片" onerror="this.onerror=function(){this.onerror=null;this.src='placeholder.png';};this.src='${item.url}';">`;
+                preview = `<img id="${uniqueId}" src="placeholder.png" alt="加载中...">`;
             } else if ((item.media_type === "audio" || item.media_type === "voice") && item.url) {
-                preview = `<audio class="media-audio-player" controls src="${mediaUrl}" onerror="this.onerror=null;this.src='${item.url}';"></audio>`;
+                preview = `<audio id="${uniqueId}" class="media-audio-player" controls></audio>`;
             } else {
                 preview = `<div style="font-size: 32px;">📄</div>`;
             }
@@ -475,6 +509,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             `;
         }).join("");
+
+        // Asynchronously load media data as base64
+        items.forEach(item => {
+            if (item.url && (item.media_type === "image" || item.media_type === "audio" || item.media_type === "voice")) {
+                const uniqueId = `media-preview-${item.hash_val}`;
+                loadMediaFileB64(item.hash_val, uniqueId, item.url, item.media_type);
+            }
+        });
     }
 
     // ----------------------------------------------------
@@ -607,11 +649,14 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("edit-media-text").value = text;
         
         const previewContainer = document.getElementById("edit-media-preview");
-        const mediaUrl = `/api/plug/astrbot_plugin_giftia/media/file/${hash}`;
         if (type === "image" && url) {
-            previewContainer.innerHTML = `<img src="${mediaUrl}" alt="预览" onerror="this.onerror=function(){this.onerror=null;this.src='placeholder.png';};this.src='${url}';">`;
+            const uniqueId = `edit-media-preview-img-${hash}`;
+            previewContainer.innerHTML = `<img id="${uniqueId}" src="placeholder.png" alt="加载中...">`;
+            loadMediaFileB64(hash, uniqueId, url, type);
         } else if ((type === "audio" || type === "voice") && url) {
-            previewContainer.innerHTML = `<audio controls src="${mediaUrl}" onerror="this.onerror=null;this.src='${url}';"></audio>`;
+            const uniqueId = `edit-media-preview-audio-${hash}`;
+            previewContainer.innerHTML = `<audio id="${uniqueId}" controls></audio>`;
+            loadMediaFileB64(hash, uniqueId, url, type);
         } else {
             previewContainer.innerHTML = `<div style="font-size: 24px;">📄</div>`;
         }
