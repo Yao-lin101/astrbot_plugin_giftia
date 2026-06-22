@@ -118,7 +118,8 @@ class GiftiaWebApi:
                 conditions.append("media_type = ?")
                 params.append(media_type)
             if search:
-                conditions.append("(caption LIKE ? OR file_name LIKE ?)")
+                conditions.append("(caption LIKE ? OR file_name LIKE ? OR hash_val LIKE ?)")
+                params.append(f"%{search}%")
                 params.append(f"%{search}%")
                 params.append(f"%{search}%")
 
