@@ -1302,10 +1302,14 @@ caption: {media_caption.caption}"""
         recent_messages = await self.data_cache.get_recent_message(
             bot_name, group_or_user_id, self.msg_number
         )
-        # 先取所有消息的media_id，去重后获取caption xml string
-        hash_vals = list(
-            {media_id for msg in recent_messages for media_id in msg.media_id_list}
-        )
+        # 先取所有消息的media_id，按从新到旧的顺序去重获取，确保越新的媒体越优先转述
+        hash_vals = []
+        seen_media = set()
+        for msg in reversed(recent_messages):
+            for media_id in reversed(msg.media_id_list):
+                if media_id not in seen_media:
+                    seen_media.add(media_id)
+                    hash_vals.append(media_id)
 
         caption_config = bot_conf.get("caption_config", {})
         max_deferred = caption_config.get("max_deferred_captions", 5)
