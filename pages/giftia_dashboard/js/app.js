@@ -121,6 +121,7 @@ window.GiftiaApp = {
             limit: this.pagination.memories.limit,
             bot_name: document.getElementById("memory-bot-name").value,
             group_or_user_id: document.getElementById("memory-group-id").value,
+            associated_user_id: document.getElementById("memory-associated-user-id").value,
             search: document.getElementById("memory-search").value
         };
 
