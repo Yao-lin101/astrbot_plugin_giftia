@@ -181,7 +181,7 @@ class Giftia(Star):
         # 定时任务
         self.task_manager = Scheduler()
         self.tools_func = ToolsFunc(
-            self.conf, self.task_manager, self.db, self.http_manager
+            self.conf, self.task_manager, self.db, self.http_manager, self.data_cache
         )
 
         # 实例化逻辑管理器
@@ -326,6 +326,18 @@ class Giftia(Star):
     async def delete_table(self, event: AstrMessageEvent, table_name: str):
         """删除数据表"""
         async for chunk in self.cmd_handler.delete_table(event, table_name):
+            yield chunk
+
+    @filter.permission_type(filter.PermissionType.ADMIN)
+    @filter.command("强制总结")
+    async def force_summarize(self, event: AstrMessageEvent):
+        """强制总结当前会话的未处理聊天记录"""
+        group_or_user_id = event.get_group_id() or event.get_sender_id()
+        bot_name = self.adapter_id_map.get(event.platform_meta.id)
+        if not bot_name:
+            yield await event.send(MessageChain([Plain("未找到对应的 Bot 实例。")]))
+            return
+        async for chunk in self.cmd_handler.force_summarize(event, bot_name, group_or_user_id):
             yield chunk
 
     # ==================== 消息事件接收 ====================
