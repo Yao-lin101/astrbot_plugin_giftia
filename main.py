@@ -236,11 +236,7 @@ class Giftia(Star):
                 else:
                     session_obj = session
 
-                bot_name = None
-                for b_name, b_conf in self.bot_map.items():
-                    if session_obj.platform_name in b_conf.get("adapter_ids", []):
-                        bot_name = b_name
-                        break
+                bot_name = self.adapter_id_map.get(session_obj.platform_name)
 
                 if bot_name:
                     bot_conf = self.bot_map.get(bot_name, {})

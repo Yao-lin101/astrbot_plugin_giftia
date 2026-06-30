@@ -115,15 +115,23 @@ class DataCache:
         self._recent_adds = [x for x in self._recent_adds if now - x[0] < 2.0]
 
         # Check for duplicate
-        for ts, b, g, c in self._recent_adds:
-            if b == bot_name and g == group_id and c == msg_data.content:
-                logger.debug(
-                    f"[Giftia] Duplicate message write bypassed: {msg_data.content}"
-                )
-                return
+        for ts, b, g, mid, c in self._recent_adds:
+            if b == bot_name and g == group_id:
+                # If both have non-empty message_id, precisely match by message_id
+                if mid and msg_data.message_id and mid == msg_data.message_id:
+                    logger.debug(
+                        f"[Giftia] Duplicate message write bypassed (message_id match): {msg_data.message_id}"
+                    )
+                    return
+                # If either message lacks a message_id, fall back to content matching
+                if (not mid or not msg_data.message_id) and c == msg_data.content:
+                    logger.debug(
+                        f"[Giftia] Duplicate message write bypassed (content match): {msg_data.content}"
+                    )
+                    return
 
         # Record this write
-        self._recent_adds.append((now, bot_name, group_id, msg_data.content))
+        self._recent_adds.append((now, bot_name, group_id, msg_data.message_id, msg_data.content))
 
         if not msg_data.message_id:
             import uuid
