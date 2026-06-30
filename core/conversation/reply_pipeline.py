@@ -32,10 +32,13 @@ class ReplyPipeline:
         tool_results: list[dict[str, str]] | None = None,
         other_data: list[str] | None = None,
         times: int = 0,
+        sent_messages: list[str] | None = None,
     ):
         """
         集成用户提示词构建、LLM调用、生成表情包与工具执行，支持递归的工具执行循环。
         """
+        if sent_messages is None:
+            sent_messages = []
         bot_conf = self.plugin.bot_map[bot_name]
         iso_string = datetime.now().isoformat()
         max_loop = self.plugin.tools_config.get("max_loop", 10)
@@ -175,6 +178,28 @@ class ReplyPipeline:
             logger.error(f"{bot_name} LLM回复失败")
             return
 
+        # Anti-drooling optimization for low-intelligence models:
+        # Filter out messages that have already been sent in the current XML tool calling loop.
+        if llm_result and llm_result.msg_chains:
+            filtered_chains = []
+            filtered_logs = []
+            filtered_texts = []
+            for i, chain in enumerate(llm_result.msg_chains):
+                log = llm_result.msg_logs[i] if i < len(llm_result.msg_logs) else ""
+                text = llm_result.msg_texts[i] if i < len(llm_result.msg_texts) else ""
+                normalized = log.strip()
+                if normalized:
+                    if normalized in sent_messages:
+                        logger.info(f"[Giftia] 防流口水：拦截到重复的会话消息: {normalized}")
+                        continue
+                    sent_messages.append(normalized)
+                filtered_chains.append(chain)
+                filtered_logs.append(log)
+                filtered_texts.append(text)
+            llm_result.msg_chains = filtered_chains
+            llm_result.msg_logs = filtered_logs
+            llm_result.msg_texts = filtered_texts
+
         # 5. 空回复拦截处理
         if not remind_message and times == 0 and not llm_result.msg_chains:
             await self.plugin.db.update_message_reply_decision(
@@ -259,5 +284,6 @@ class ReplyPipeline:
                 image_urls=image_base64,
                 times=times + 1,
                 other_data=other_data,
+                sent_messages=sent_messages,
             ):
                 yield chunk
