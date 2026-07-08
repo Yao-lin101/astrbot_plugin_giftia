@@ -4,6 +4,7 @@ from datetime import datetime
 
 from astrbot.api import logger
 
+from ..utils.schemas import normalize_memory_importance
 from .passive_context import PassiveContextMixin
 
 RELATION_DELTA_LIMIT = 5
@@ -81,26 +82,46 @@ class PassiveSummaryTaskMixin(PassiveContextMixin):
         )
 
         memory_matches = re.finditer(
-            r'<memory(?:\s+users=["\']([^"\']*)["\'])?>(.*?)</memory>',
+            r"<memory([^>]*)>(.*?)</memory>",
             completion_text,
             re.DOTALL,
         )
         for match in memory_matches:
-            users_attr = match.group(1) or ""
+            attrs = {
+                key: value
+                for key, value in re.findall(
+                    r'([a-zA-Z_][\w-]*)=["\']([^"\']*)["\']',
+                    match.group(1) or "",
+                )
+            }
+            users_attr = attrs.get("users", "")
+            importance = normalize_memory_importance(attrs.get("importance"), 5)
             text = match.group(2).strip()
 
             if not text or text == "无":
                 continue
 
             associated_ids = []
+            seen_associated_ids = set()
+            self_id_str = str(self_id)
             if users_attr:
                 for u in re.split(r"[,，]", users_attr):
                     u = u.strip()
                     resolved_uid = context["nickname_to_user_id"].get(u, u)
-                    if resolved_uid:
+                    resolved_uid = str(resolved_uid).strip() if resolved_uid else ""
+                    if not resolved_uid or resolved_uid == self_id_str:
+                        continue
+                    if resolved_uid not in seen_associated_ids:
                         associated_ids.append(resolved_uid)
+                        seen_associated_ids.add(resolved_uid)
 
-            primary_user = associated_ids[0] if associated_ids else self_id
+            if not associated_ids:
+                logger.info(
+                    f"[Giftia Passive Memory] 跳过长期记忆入库：未关联到除机器人自身以外的用户。记忆内容: {text}"
+                )
+                continue
+
+            primary_user = associated_ids[0]
 
             await self.plugin.data_cache.add_memory(
                 bot_name=bot_name,
@@ -108,9 +129,10 @@ class PassiveSummaryTaskMixin(PassiveContextMixin):
                 text=text,
                 user_id=primary_user,
                 associated_user_ids=associated_ids,
+                importance=importance,
             )
             logger.info(
-                f"[Giftia Passive Memory] 已成功记录长期记忆: {text} (关联用户: {associated_ids})"
+                f"[Giftia Passive Memory] 已成功记录长期记忆: {text} (关联用户: {associated_ids}, 重要度: {importance})"
             )
         return True
 
